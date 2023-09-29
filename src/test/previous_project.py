@@ -61,8 +61,8 @@ def camera_thread():
                 hand2 = hands[1]
                 # This is to force the program to recognize the right hand as hand1 and left hand as hand2
                 # however it does not work due to reasons unknown
-                hand1["type"] = "Right"
-                hand2["type"] = "Left"
+                hand1["type"] = "Left"
+                hand2["type"] = "Right"
 
                 # Setting variable to convert position from first hand to robot co-ordinates
                 fingers = detector.fingersUp(hand1)
@@ -91,8 +91,11 @@ def camera_thread():
 
 # This section sets up a function to control the Mirobot with the converted co-ordinates
 def arm_thread():
-    arm = WlkataMirobot(portname='COM5')
+    arm = WlkataMirobot(portname='COM3')
     arm.home()
+
+    # switch_time = time.time()
+    # gripper_open = False
 
     while True:
         # This sets the arm to the received co-ordinates
@@ -107,6 +110,15 @@ def arm_thread():
 
         if fingers == [1, 1, 1, 1, 1]:
             arm.gripper_open()
+
+        # if (time.time() - switch_time) > 10:
+        #     if gripper_open:
+        #         arm.gripper_close()
+        #         print('opening gripper')
+        #     else:
+        #         arm.gripper_open()
+        #         print('closing gripper')
+        #     gripper_open = not gripper_open
 
         key = cv2.waitKey(1)
         if key == ord('q'):
