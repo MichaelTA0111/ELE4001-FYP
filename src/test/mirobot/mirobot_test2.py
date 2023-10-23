@@ -49,17 +49,18 @@ def arm_thread():
 
     print('Arm Starting')
 
-    arm = WlkataMirobot(portname='COM3', default_speed=20)
+    arm = WlkataMirobot(portname='COM3', debug=False, default_speed=20)
     arm.home()
 
-    Thread(target=logging_thread, args=(arm, )).start()
+    logger = CoordinateLogger()
 
-    previous_time = time.time()
+    previous_move_time = time.time()
+    previous_log_time = time.time()
 
     while True:
         current_time = time.time()
-        if current_time - previous_time > 10:
-            previous_time = current_time
+        if current_time - previous_move_time > 10:
+            previous_move_time = current_time
             joints[1] = random.randint(-50, 100)
             joints[2] = random.randint(0, 50)
             joints[3] = random.randint(-100, 0)
@@ -69,7 +70,19 @@ def arm_thread():
             print(f'Setting joints to: \n1 {joints[1]}\n2 {joints[2]}\n3 {joints[3]}\n4 {joints[4]}\n5 {joints[5]}\n'
                   f'6 {joints[6]}')
 
-            arm.set_joint_angle(joints, speed=20)
+        motion = True
+        previous_log_time = time.time() * 1000
+        logger.log_coordinates(arm)
+        while motion:
+            try:
+                if (current_log_time := time.time() * 1000) - previous_log_time >= 500:
+                    print('Attempting to log coordinates')
+                    previous_log_time = current_log_time
+                    logger.log_coordinates(arm)
+                    print('Successfully logged coordinates')
+                Thread(target=arm.set_joint_angle, args=(joints, ), kwargs={'speed': 20}).start()
+            except Exception as e:
+                print(f'ERROR! {e}')
 
         if do_open:
             arm.gripper_open()
