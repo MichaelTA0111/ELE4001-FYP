@@ -7,6 +7,8 @@ from wlkata_mirobot import WlkataMirobot
 from coordinate_logger import CoordinateLogger
 
 
+x, y, z = 100, 100, 100
+roll, pitch, yaw = 0, 0, 0
 do_open, do_close = False, False
 joints = {1: 45, 2: -30, 3: 50, 4: 0, 5: -25, 6: -45}
 
@@ -31,6 +33,17 @@ def camera_thread():
             break
 
 
+def logging_thread(arm):
+    logger = CoordinateLogger()
+
+    previous_millis = time.time() * 1000
+
+    while True:
+        if (current_millis := time.time() * 1000) - previous_millis >= 500:
+            previous_millis = current_millis
+            logger.log_coordinates(arm)
+
+
 def arm_thread():
     global do_open, do_close, joints
 
@@ -39,7 +52,7 @@ def arm_thread():
     arm = WlkataMirobot(portname='COM3', default_speed=20)
     arm.home()
 
-    logger = CoordinateLogger()
+    Thread(target=logging_thread, args=(arm, )).start()
 
     previous_time = time.time()
 
@@ -56,9 +69,7 @@ def arm_thread():
             print(f'Setting joints to: \n1 {joints[1]}\n2 {joints[2]}\n3 {joints[3]}\n4 {joints[4]}\n5 {joints[5]}\n'
                   f'6 {joints[6]}')
 
-        arm.set_joint_angle(joints, speed=20)
-
-        logger.log_coordinates(arm)
+            arm.set_joint_angle(joints, speed=20)
 
         if do_open:
             arm.gripper_open()

@@ -18,6 +18,9 @@ class CoordinateLogger:
                           f'{status.angle.joint4},{status.angle.joint5},{status.angle.joint6}\n')
         self.coordinate_list.append(coordinate_str)
 
+        if not len(self.coordinate_list) % 10:
+            print(f'Logged {len(self.coordinate_list)} items')
+
         if len(self.coordinate_list) >= 50:
             with open(self.filename, 'a') as f:
                 [f.write(line) for line in self.coordinate_list]
