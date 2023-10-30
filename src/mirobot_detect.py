@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 from wlkata_mirobot import WlkataMirobot
 
-from config import MIROBOT_PORT
+from config import MIROBOT_PORT, RESOLUTION_HEIGHT, RESOLUTION_WIDTH
 from opencv_helper_functions import empty, stack_images, draw_contours
 
 
@@ -29,14 +29,13 @@ def camera_thread():
     cv2.createTrackbar('Val Min', 'Trackbars', 153, 255, empty)
     cv2.createTrackbar('Val Max', 'Trackbars', 255, 255, empty)
 
-    width, height = 1280, 720
-    cap = cv2.VideoCapture(1)
-    cap.set(3, width)
-    cap.set(4, height)
+    cap = cv2.VideoCapture(0)
+    cap.set(3, RESOLUTION_WIDTH)
+    cap.set(4, RESOLUTION_HEIGHT)
 
     while run:
         _, img = cap.read()
-        img = cv2.flip(img, 1)
+        # img = cv2.flip(img, 1)
         img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
         hue_min = cv2.getTrackbarPos('Hue Min', 'Trackbars')
@@ -45,7 +44,7 @@ def camera_thread():
         sat_max = cv2.getTrackbarPos('Sat Max', 'Trackbars')
         val_min = cv2.getTrackbarPos('Val Min', 'Trackbars')
         val_max = cv2.getTrackbarPos('Val Max', 'Trackbars')
-        print(f'{hue_min} {hue_max} {sat_min} {sat_max} {val_min} {val_max}')
+        # print(f'{hue_min} {hue_max} {sat_min} {sat_max} {val_min} {val_max}')
 
         lower = np.array([hue_min, sat_min, val_min])
         upper = np.array([hue_max, sat_max, val_max])
@@ -59,22 +58,6 @@ def camera_thread():
         img_stack = stack_images(0.5, [[img, img_hsv, mask], [img_resultant, img_canny, img_contour]])
 
         cv2.imshow('Image Stack', img_stack)
-
-        key = cv2.waitKey(1)
-        if key == ord('q'):
-            break
-
-    print('Camera Starting')
-
-    width, height = 1280, 720
-    cap = cv2.VideoCapture(0)
-    cap.set(3, width)
-    cap.set(4, height)
-
-    while run:
-        _, img = cap.read()
-        img = cv2.flip(img, 1)
-        cv2.imshow('Video Feed', img)
 
         key = cv2.waitKey(1)
         if key == ord('q'):
@@ -92,7 +75,7 @@ def arm_thread():
     previous_move_time = time.time()
 
     while run:
-        if (current_time := time.time()) - previous_move_time > 10:
+        if (current_time := time.time()) - previous_move_time > 30:
             previous_move_time = current_time
             joints[1] = random.randint(-50, 100)
             joints[2] = random.randint(0, 50)
