@@ -57,39 +57,29 @@ def empty(a):
     pass
 
 
-def draw_contours(img_src, img_dst):
+def draw_contour(img, c):
+    cv2.drawContours(img, c, -1, (255, 0, 0), 3)
+    perimeter = cv2.arcLength(c, True)
+    approx_outline = cv2.approxPolyDP(c, 0.02 * perimeter, True)
+    x, y, w, h = cv2.boundingRect(approx_outline)
+
+    cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+    return [x, y, w, h]
+
+
+def get_contours(img_src, img_dst):
     contours, hierarchy = cv2.findContours(img_src, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+
+    positions = []
 
     for c in contours:
         area = cv2.contourArea(c)
 
         if area > 500:
-            cv2.drawContours(img_dst, c, -1, (255, 0, 0), 3)
-            perimeter = cv2.arcLength(c, True)
-            approx_outline = cv2.approxPolyDP(c, 0.02 * perimeter, True)
-            # num_corners = len(approx_outline)
-            x, y, w, h = cv2.boundingRect(approx_outline)
+            positions.append(draw_contour(img_dst, c))
 
-            # if num_corners == 3:
-            #     obj_type = 'Triangle'
-            # elif num_corners == 4:
-            #     if (aspect_ratio := w / h) > 0.98 and aspect_ratio < 1.02:
-            #         obj_type = 'Square'
-            #     else:
-            #         obj_type = 'Rectangle'
-            # elif num_corners > 4:
-            #     obj_type = 'Circle'
-            # else:
-            #     obj_type = 'Unknown'
-
-            cv2.rectangle(img_dst, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            # cv2.putText(img_dst,
-            #             obj_type,
-            #             (x + w // 2 - 25, y + h // 2),
-            #             cv2.FONT_HERSHEY_COMPLEX,
-            #             0.5,
-            #             (0, 0, 0),
-            #             2)
+    return positions
 
 
 if __name__ == '__main__':
