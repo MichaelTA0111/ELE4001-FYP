@@ -10,6 +10,7 @@ from config import MIROBOT_PORT, RESOLUTION_HEIGHT, RESOLUTION_WIDTH
 from opencv_helper_functions import stack_images, get_contours
 
 
+ee_coords = [[0, 0]]
 x, y, z = 100, 100, 100
 roll, pitch, yaw = 0, 0, 0
 do_open, do_close = False, False
@@ -18,7 +19,7 @@ run = True
 
 
 def camera_thread():
-    global x, y, z, do_open, do_close, run
+    global ee_coords, x, y, z, do_open, do_close, run
 
     # Set up camera feed
     cap = cv2.VideoCapture(0)
@@ -65,6 +66,17 @@ def camera_thread():
         contours = get_contours(img_canny, img_contour)
         midpoints = [[c[0] + c[2] // 2, c[1] + c[3] // 2] for c in contours]
 
+        # Only parse the desired end effector coordinates if 2 blocks are found
+        if len(midpoints) == 2:
+            # Convert the midpoints from the image coordinates to end-effector cartesian coordinates
+            # Note the x ordinate from the image refers to the y position of the end effector and vice versa
+            ee_coords = [[np.interp(m[1], [166, 606], [0, 250]), np.interp(m[0], [134, 1152], [-250, 250])]
+                         for m in midpoints]
+
+            # Account for offset of end-effector position due to the gripper being non-symmetrical
+            # Add 10 to x-ordinate, subtract 15 from y-ordinate
+            ee_coords = [[coords[0] + 10, coords[1] - 15] for coords in ee_coords]
+
         img_stack = stack_images(0.5,
                                  [[img_warped, img_hsv, blue_mask], [img_resultant, img_canny, img_contour]])
 
@@ -76,37 +88,61 @@ def camera_thread():
 
 
 def arm_thread():
-    global do_open, do_close, joints, run
+    global ee_coords, do_open, do_close, joints, run
 
     print('Arm Starting')
 
     arm = WlkataMirobot(portname=MIROBOT_PORT, debug=False, default_speed=20)
     arm.home()
 
-    previous_move_time = time.time()
-
     while run:
-        if (current_time := time.time()) - previous_move_time > 30:
-            previous_move_time = current_time
-            joints[1] = random.randint(-50, 100)
-            joints[2] = random.randint(0, 50)
-            joints[3] = random.randint(-100, 0)
-            joints[4] = random.randint(-180, 180)
-            joints[5] = random.randint(-180, 0)
-            joints[6] = random.randint(-180, 180)
+        pass
 
-            print(f'Setting joints to: \n1 {joints[1]}\n2 {joints[2]}\n3 {joints[3]}\n4 {joints[4]}\n5 {joints[5]}\n'
-                  f'6 {joints[6]}')
-            arm.set_joint_angle(joints)
+    if len(ee_coords) == 2:
+        print('Successfully found 2 blocks!')
 
-        if do_open:
-            arm.gripper_open()
-            do_open = False
-            print('Opening Gripper')
-        elif do_close:
-            arm.gripper_close()
-            do_close = False
-            print('Closing Gripper')
+        src = ee_coords[0]
+        dst = ee_coords[1]
+
+        print(f'Moving above source block')
+        arm.p2p_interpolation(src[0], src[1], 120, 0, 0, 0)
+        time.sleep(1)
+
+        print(f'Opening gripper')
+        arm.gripper_open()
+        time.sleep(1)
+
+        print(f'Moving to source block')
+        arm.p2p_interpolation(src[0], src[1], 70, 0, 0, 0)
+        time.sleep(1)
+
+        print(f'Picking up source block')
+        arm.gripper_close()
+        time.sleep(1)
+
+        print(f'Lifting source block')
+        arm.p2p_interpolation(src[0], src[1], 120, 0, 0, 0)
+        time.sleep(1)
+
+        print(f'Moving above destination block')
+        arm.p2p_interpolation(dst[0], dst[1], 120, 0, 0, 0)
+        time.sleep(1)
+
+        print(f'Setting on destination block')
+        arm.p2p_interpolation(dst[0], dst[1], 95, 0, 0, 0)
+        time.sleep(1)
+
+        print(f'Releasing down source block')
+        arm.gripper_open()
+        time.sleep(1)
+
+        print(f'Moving above destination block')
+        arm.p2p_interpolation(dst[0], dst[1], 120, 0, 0, 0)
+        time.sleep(1)
+
+        print(f'Closing gripper')
+        arm.gripper_close()
+        time.sleep(1)
 
     arm.home()
 
