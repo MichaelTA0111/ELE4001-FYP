@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from opencv_helper_functions import stack_images, draw_contours, empty
+from opencv_helper_functions import stack_images, get_contours, empty
 from config import RESOLUTION_HEIGHT, RESOLUTION_WIDTH
 
 
@@ -37,7 +37,7 @@ def detect():
         img_canny = cv2.Canny(img_resultant, 50, 50)
         img_contour = img.copy()
 
-        draw_contours(img_canny, img_contour)
+        get_contours(img_canny, img_contour)
 
         img_stack = stack_images(0.5, [[img, img_hsv, mask], [img_resultant, img_canny, img_contour]])
 
