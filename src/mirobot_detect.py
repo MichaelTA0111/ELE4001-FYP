@@ -41,7 +41,7 @@ def camera_thread():
     blue_hsv_min = np.array([100, 114, 65])
     blue_hsv_max = np.array([112, 255, 206])
 
-    pts1 = np.float32([[370, 274], [994, 236], [182, 708], [1244, 706]])  # Points on original image
+    pts1 = np.float32([[264, 116], [1028, 108], [112, 652], [1180, 656]])  # Points on original image
     pts2 = np.float32([[0, 0], [RESOLUTION_WIDTH, 0],
                        [0, RESOLUTION_HEIGHT], [RESOLUTION_WIDTH, RESOLUTION_HEIGHT]])  # New output points
     ct_matrix = cv2.getPerspectiveTransform(pts1, pts2)
@@ -70,7 +70,7 @@ def camera_thread():
         if len(midpoints) == 2:
             # Convert the midpoints from the image coordinates to end-effector cartesian coordinates
             # Note the x ordinate from the image refers to the y position of the end effector and vice versa
-            ee_coords = [[np.interp(m[1], [166, 606], [0, 250]), np.interp(m[0], [134, 1152], [-250, 250])]
+            ee_coords = [[np.interp(m[1], [166, 604], [0, 250]), np.interp(m[0], [132, 1152], [-250, 250])]
                          for m in midpoints]
 
             # Account for offset of end-effector position due to the gripper being non-symmetrical

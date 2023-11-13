@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 
+from datetime import datetime
+
 from opencv_helper_functions import stack_images
 from config import RESOLUTION_HEIGHT, RESOLUTION_WIDTH
 
@@ -16,7 +18,7 @@ def detect():
     while True:
         _, img = cap.read()
 
-        pts1 = np.float32([[370, 274], [994, 236], [182, 708], [1244, 706]])  # Points on original image
+        pts1 = np.float32([[264, 116], [1028, 108], [112, 652], [1180, 656]])  # Points on original image
         pts2 = np.float32([[0, 0], [RESOLUTION_WIDTH, 0],
                            [0, RESOLUTION_HEIGHT], [RESOLUTION_WIDTH, RESOLUTION_HEIGHT]])  # New output points
         matrix = cv2.getPerspectiveTransform(pts1, pts2)
@@ -29,6 +31,9 @@ def detect():
 
         key = cv2.waitKey(1)
         if key == ord('q'):
+            start_time_str = datetime.utcnow().strftime('%Y-%m-%dT%H-%M-%SZ')
+            filename = f'camera_transform_calibration_{start_time_str}.png'
+            cv2.imwrite(filename, img_stack)
             break
 
 
