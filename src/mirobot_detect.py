@@ -27,21 +27,11 @@ def camera_thread():
     cap.set(4, RESOLUTION_HEIGHT)
     cap.set(cv2.CAP_PROP_FPS, 5)
 
-    # # Create the trackbar window for HSV values
-    # cv2.namedWindow('Trackbars')
-    # cv2.resizeWindow('Trackbars', 640, 240)
-    # cv2.createTrackbar('Hue Min', 'Trackbars', 100, 179, empty)  # Ranges from 0 to 360 or 0 to 180?
-    # cv2.createTrackbar('Hue Max', 'Trackbars', 112, 179, empty)
-    # cv2.createTrackbar('Sat Min', 'Trackbars', 114, 255, empty)
-    # cv2.createTrackbar('Sat Max', 'Trackbars', 255, 255, empty)
-    # cv2.createTrackbar('Val Min', 'Trackbars', 65, 255, empty)
-    # cv2.createTrackbar('Val Max', 'Trackbars', 206, 255, empty)
-
     # Set the HSV values
-    blue_hsv_min = np.array([100, 114, 65])
-    blue_hsv_max = np.array([112, 255, 206])
+    blue_hsv_min = np.array([100, 94, 71])
+    blue_hsv_max = np.array([116, 240, 158])
 
-    pts1 = np.float32([[264, 116], [1028, 108], [112, 652], [1180, 656]])  # Points on original image
+    pts1 = np.float32([[292, 172], [976, 172], [162, 652], [1086, 664]])  # Points on original image
     pts2 = np.float32([[0, 0], [RESOLUTION_WIDTH, 0],
                        [0, RESOLUTION_HEIGHT], [RESOLUTION_WIDTH, RESOLUTION_HEIGHT]])  # New output points
     ct_matrix = cv2.getPerspectiveTransform(pts1, pts2)
@@ -50,13 +40,6 @@ def camera_thread():
         _, img = cap.read()
         img_warped = cv2.warpPerspective(img, ct_matrix, (RESOLUTION_WIDTH, RESOLUTION_HEIGHT))
         img_hsv = cv2.cvtColor(img_warped, cv2.COLOR_BGR2HSV)
-
-        # hue_min = cv2.getTrackbarPos('Hue Min', 'Trackbars')
-        # hue_max = cv2.getTrackbarPos('Hue Max', 'Trackbars')
-        # sat_min = cv2.getTrackbarPos('Sat Min', 'Trackbars')
-        # sat_max = cv2.getTrackbarPos('Sat Max', 'Trackbars')
-        # val_min = cv2.getTrackbarPos('Val Min', 'Trackbars')
-        # val_max = cv2.getTrackbarPos('Val Max', 'Trackbars')
 
         blue_mask = cv2.inRange(img_hsv, blue_hsv_min, blue_hsv_max)
         img_resultant = cv2.bitwise_and(img_warped, img_warped, mask=blue_mask)
@@ -70,12 +53,12 @@ def camera_thread():
         if len(midpoints) == 2:
             # Convert the midpoints from the image coordinates to end-effector cartesian coordinates
             # Note the x ordinate from the image refers to the y position of the end effector and vice versa
-            ee_coords = [[np.interp(m[1], [166, 604], [0, 250]), np.interp(m[0], [132, 1152], [-250, 250])]
+            ee_coords = [[np.interp(m[1], [166, 604], [9, 250]), np.interp(m[0], [132, 1152], [-250, 250])]
                          for m in midpoints]
 
             # Account for offset of end-effector position due to the gripper being non-symmetrical
             # Add 10 to x-ordinate, subtract 15 from y-ordinate
-            ee_coords = [[coords[0] + 10, coords[1] - 15] for coords in ee_coords]
+            ee_coords = [[coords[0], coords[1] - 14] for coords in ee_coords]
 
         img_stack = stack_images(0.5,
                                  [[img_warped, img_hsv, blue_mask], [img_resultant, img_canny, img_contour]])
@@ -99,7 +82,7 @@ def arm_thread():
         pass
 
     if len(ee_coords) == 2:
-        print('Successfully found 2 blocks!')
+        print(f'Successfully found 2 blocks at {ee_coords}!')
 
         src = ee_coords[0]
         dst = ee_coords[1]

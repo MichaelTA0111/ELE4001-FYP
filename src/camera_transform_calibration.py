@@ -18,7 +18,7 @@ def detect():
     while True:
         _, img = cap.read()
 
-        pts1 = np.float32([[264, 116], [1028, 108], [112, 652], [1180, 656]])  # Points on original image
+        pts1 = np.float32([[292, 172], [976, 172], [162, 652], [1086, 664]])  # Points on original image
         pts2 = np.float32([[0, 0], [RESOLUTION_WIDTH, 0],
                            [0, RESOLUTION_HEIGHT], [RESOLUTION_WIDTH, RESOLUTION_HEIGHT]])  # New output points
         matrix = cv2.getPerspectiveTransform(pts1, pts2)
