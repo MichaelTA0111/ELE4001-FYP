@@ -4,21 +4,40 @@ from threading import Thread
 import numpy as np
 import cv2
 from wlkata_mirobot import WlkataMirobot
+from cvzone.HandTrackingModule import HandDetector
 
 from config import MIROBOT_PORT, RESOLUTION_HEIGHT, RESOLUTION_WIDTH
 from opencv_helper_functions import stack_images, get_contours
 
 
-ee_coords = [[0, 0]]
-x, y, z = 100, 100, 100
-roll, pitch, yaw = 0, 0, 0
-do_open, do_close = False, False
-joints = {1: 45, 2: -30, 3: 50, 4: 0, 5: -25, 6: -45}
+ee_coords = [[], []]
 run = True
+detector = HandDetector(detectionCon=0.8, maxHands=1)
+
+
+def map_coords(img_coords, z=70):
+    """
+    Convert image coordinates to end-effector coordinates
+    :param img_coords: List of x and y coordinates from the image
+    :param z: The z-ordinate of the object being parsed from the image
+    :return: List of x and y coordinates for the robot end-effector
+    """
+    # TODO: account for variable height, required for hand heights
+    z_eq = 70
+    z_bar = z - z_eq
+
+    # Note the x and y ordinates from the image map to the y and x ordinates of the end effector respectively
+    # Note the x ordinate is scaled from 9 to 250 instead of 0 to 250 to account for an offset
+    ee_coords = [np.interp(img_coords[1], [166, 604], [9, 250]),
+                 np.interp(img_coords[0], [132, 1152], [-250, 250])]
+
+    # Account for offset of end-effector position due to the gripper being asymmetrical,
+    # i.e. Add 0 to x-ordinate, subtract 14 from y-ordinate
+    return [ee_coords[0] + 0, ee_coords[1] - 14]
 
 
 def camera_thread():
-    global ee_coords, x, y, z, do_open, do_close, run
+    global ee_coords, run, detector
 
     # Set up camera feed
     cap = cv2.VideoCapture(0)
@@ -38,6 +57,8 @@ def camera_thread():
     while run:
         _, img = cap.read()
         img_warped = cv2.warpPerspective(img, ct_matrix, (RESOLUTION_WIDTH, RESOLUTION_HEIGHT))
+        hands, img_warped = detector.findHands(img_warped)
+
         img_hsv = cv2.cvtColor(img_warped, cv2.COLOR_BGR2HSV)
 
         blue_mask = cv2.inRange(img_hsv, blue_hsv_min, blue_hsv_max)
@@ -45,20 +66,17 @@ def camera_thread():
         img_canny = cv2.Canny(img_resultant, 50, 50)
         img_contour = img_warped.copy()
 
-        contours = get_contours(img_canny, img_contour)
-        midpoints = [[c[0] + c[2] // 2, c[1] + c[3] // 2] for c in contours]
+        # Only parse the block coordinates if 1 block is found
+        if (contours := get_contours(img_canny, img_contour)) and len(contours) == 1:
+            contour = contours[0]
+            block_centre = [contour[0] + contour[2] // 2, contour[1] + contour[3] // 2]
+            ee_coords[0] = map_coords(block_centre)
 
-        # Only parse the desired end effector coordinates if 2 blocks are found
-        if len(midpoints) == 2:
-            # Convert the midpoints from the image coordinates to end-effector cartesian coordinates
-            # Note the x ordinate from the image refers to the y position of the end effector and vice versa
-            # Note the x ordinate is scaled from 9 to 250 instead of 0 to 250 to account for an offset
-            ee_coords = [[np.interp(m[1], [166, 604], [9, 250]), np.interp(m[0], [132, 1152], [-250, 250])]
-                         for m in midpoints]
-
-            # Account for offset of end-effector position due to the gripper being non-symmetrical
-            # Add 0 to x-ordinate, subtract 14 from y-ordinate
-            ee_coords = [[coords[0] + 0, coords[1] - 14] for coords in ee_coords]
+        # Only parse the hand coordinates if 1 hand is found
+        if hands and len(hands) == 1:
+            hand = hands[0]
+            hand_centre = list(hand.get('center'))
+            ee_coords[1] = map_coords(hand_centre)
 
         img_stack = stack_images(0.5,
                                  [[img_warped, img_hsv, blue_mask], [img_resultant, img_canny, img_contour]])
@@ -71,24 +89,26 @@ def camera_thread():
 
 
 def arm_thread():
-    global ee_coords, do_open, do_close, joints, run
+    global ee_coords, run
 
     print('Arm Starting')
 
     arm = WlkataMirobot(portname=MIROBOT_PORT, debug=False, default_speed=20)
+    arm.gripper_close()
     arm.home()
 
+    # Wait until the camera thread is stopped
     while run:
         pass
 
     if len(ee_coords) == 2:
-        print(f'Successfully found 2 blocks at {ee_coords}!')
+        print(f'Successfully found a blocks at {ee_coords[0]} and a hand at {ee_coords[1]}!')
 
         src = ee_coords[0]
         dst = ee_coords[1]
 
         print(f'Moving above source block')
-        arm.p2p_interpolation(src[0], src[1], 120, 0, 0, 0)
+        arm.p2p_interpolation(src[0], src[1], 130, 0, 0, 0)
         time.sleep(1)
 
         print(f'Opening gripper')
@@ -104,15 +124,15 @@ def arm_thread():
         time.sleep(1)
 
         print(f'Lifting source block')
-        arm.p2p_interpolation(src[0], src[1], 120, 0, 0, 0)
+        arm.p2p_interpolation(src[0], src[1], 130, 0, 0, 0)
         time.sleep(1)
 
         print(f'Moving above destination block')
-        arm.p2p_interpolation(dst[0], dst[1], 120, 0, 0, 0)
+        arm.p2p_interpolation(dst[0], dst[1], 130, 0, 0, 0)
         time.sleep(1)
 
         print(f'Setting on destination block')
-        arm.p2p_interpolation(dst[0], dst[1], 95, 0, 0, 0)
+        arm.p2p_interpolation(dst[0], dst[1], 105, 0, 0, 0)
         time.sleep(1)
 
         print(f'Releasing down source block')
@@ -120,7 +140,7 @@ def arm_thread():
         time.sleep(1)
 
         print(f'Moving above destination block')
-        arm.p2p_interpolation(dst[0], dst[1], 120, 0, 0, 0)
+        arm.p2p_interpolation(dst[0], dst[1], 130, 0, 0, 0)
         time.sleep(1)
 
         print(f'Closing gripper')
