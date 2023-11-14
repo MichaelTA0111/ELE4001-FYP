@@ -53,12 +53,13 @@ def camera_thread():
         if len(midpoints) == 2:
             # Convert the midpoints from the image coordinates to end-effector cartesian coordinates
             # Note the x ordinate from the image refers to the y position of the end effector and vice versa
+            # Note the x ordinate is scaled from 9 to 250 instead of 0 to 250 to account for an offset
             ee_coords = [[np.interp(m[1], [166, 604], [9, 250]), np.interp(m[0], [132, 1152], [-250, 250])]
                          for m in midpoints]
 
             # Account for offset of end-effector position due to the gripper being non-symmetrical
-            # Add 10 to x-ordinate, subtract 15 from y-ordinate
-            ee_coords = [[coords[0], coords[1] - 14] for coords in ee_coords]
+            # Add 0 to x-ordinate, subtract 14 from y-ordinate
+            ee_coords = [[coords[0] + 0, coords[1] - 14] for coords in ee_coords]
 
         img_stack = stack_images(0.5,
                                  [[img_warped, img_hsv, blue_mask], [img_resultant, img_canny, img_contour]])
