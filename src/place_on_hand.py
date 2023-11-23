@@ -94,7 +94,7 @@ def arm_thread():
     print('Arm Starting')
 
     arm = WlkataMirobot(portname=MIROBOT_PORT, debug=False, default_speed=20)
-    arm.gripper_close()
+    # arm.gripper_close()
     arm.home()
 
     # Wait until the camera thread is stopped
