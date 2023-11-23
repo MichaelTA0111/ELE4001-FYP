@@ -3,3 +3,4 @@ opencv-python>=4.8.0.76
 cvzone>=1.6.1
 mediapipe>=0.10.5
 wlkata-mirobot-python>=0.1.14
+pykinect_azure>=0.0.3
