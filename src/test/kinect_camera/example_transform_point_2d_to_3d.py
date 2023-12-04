@@ -32,6 +32,8 @@ if __name__ == "__main__":
         if not ret_color or not ret_depth:
             continue
 
+        print(color_image.shape)
+        print(transformed_depth_image[640][360])
         pix_x = color_image.shape[1] // 2
         pix_y = color_image.shape[0] // 2
         rgb_depth = transformed_depth_image[pix_y, pix_x]
