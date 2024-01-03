@@ -47,5 +47,6 @@ def detect():
         if key == ord('q'):
             break
 
+
 if __name__ == '__main__':
     detect()
