@@ -53,12 +53,6 @@ def camera_thread():
     # Start device
     device = pykinect.start_device(config=device_config)
 
-    # # Set up camera feed
-    # cap = cv2.VideoCapture(0)
-    # cap.set(3, RES_WIDTH)
-    # cap.set(4, RES_HEIGHT)
-    # cap.set(cv2.CAP_PROP_FPS, 5)
-
     # Set the HSV values
     blue_hsv_min = np.array([100, 94, 71])
     blue_hsv_max = np.array([116, 240, 158])
