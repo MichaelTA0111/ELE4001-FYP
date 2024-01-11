@@ -7,7 +7,7 @@ from config import MIROBOT_PORT, RESOLUTION_HEIGHT, RESOLUTION_WIDTH
 
 x, y, z = 100, 100, 100
 a, b, c = 0, 0, 0
-do_open, do_close = False, False
+do_open, do_close, do_home = False, False, False
 
 
 def camera_thread():
@@ -29,7 +29,7 @@ def camera_thread():
 
 
 def parse_command():
-    global x, y, z, a, b, c, do_open, do_close
+    global x, y, z, a, b, c, do_open, do_close, do_home
 
     command = input()
     command = command.split(' ')
@@ -49,10 +49,12 @@ def parse_command():
         do_open = True
     if command[0] == 'close':
         do_close = True
+    if command[0] == 'home':
+        do_home = True
 
 
 def arm_thread():
-    global x, y, z, a, b, c, do_open, do_close
+    global x, y, z, a, b, c, do_open, do_close, do_home
 
     print('Arm Starting')
 
@@ -73,6 +75,9 @@ def arm_thread():
             arm.gripper_close()
             do_close = False
             print('Closing Gripper')
+        elif do_home:
+            arm.home()
+            print('Moving to home position')
 
 
 def main():
