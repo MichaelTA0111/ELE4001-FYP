@@ -4,3 +4,4 @@ cvzone>=1.6.1
 mediapipe>=0.10.5
 wlkata-mirobot-python>=0.1.14
 pykinect_azure>=0.0.3
+pytransform3d>=3.5.0
