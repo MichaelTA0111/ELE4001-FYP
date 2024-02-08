@@ -98,7 +98,8 @@ def camera_thread():
             contour = contours[0]
             block_centre = [contour[0] + contour[2] // 2, contour[1] + contour[3] // 2]
             block_depth = img_warped_depth[block_centre[1], block_centre[0]]
-            ee_coords[0] = map_coords(block_centre, block_depth)
+            print(f'Block found at ({block_centre[1]}, {block_centre[0]}, {block_depth})')
+            # ee_coords[0] = map_coords(block_centre, block_depth)
 
         # Only parse the hand coordinates if 1 hand is found
         if hands and len(hands) == 1:
@@ -129,7 +130,8 @@ def arm_thread():
     while run:
         pass
 
-    if len(ee_coords) == 2:
+    # Temp, change length to 2 to work
+    if len(ee_coords) == 3:
         print(f'Successfully found a block at {ee_coords[0]} and a hand at {ee_coords[1]}!')
 
         src = ee_coords[0]
