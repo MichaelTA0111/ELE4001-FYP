@@ -38,6 +38,7 @@ def detect():
         img_contour = img.copy()
 
         get_contours(img_canny, img_contour)
+        get_contours(img_canny, img_contour, small=True)
 
         img_stack = stack_images(0.5, [[img, img_hsv, mask], [img_resultant, img_canny, img_contour]])
 
