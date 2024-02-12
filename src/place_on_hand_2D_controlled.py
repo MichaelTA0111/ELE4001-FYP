@@ -6,8 +6,9 @@ import cv2
 from wlkata_mirobot import WlkataMirobot
 from cvzone.HandTrackingModule import HandDetector
 
-from config import MIROBOT_PORT, RESOLUTION_HEIGHT, RESOLUTION_WIDTH
+from config import MIROBOT_PORT, RES_HEIGHT, RES_WIDTH
 from opencv_helper_functions import stack_images, get_contours
+from pykinect_helper_functions import initialise_camera, read_camera
 
 
 ee_pos = []
@@ -40,11 +41,7 @@ def map_coords(img_coords, z=70):
 def camera_thread():
     global ee_pos, ee_coords, run, detector
 
-    # Set up camera feed
-    cap = cv2.VideoCapture(0)
-    cap.set(3, RESOLUTION_WIDTH)
-    cap.set(4, RESOLUTION_HEIGHT)
-    cap.set(cv2.CAP_PROP_FPS, 5)
+    camera = initialise_camera()
 
     # Set the HSV values
     blue_dot_hsv_min = np.array([107, 49, 93])
@@ -53,13 +50,17 @@ def camera_thread():
     blue_block_hsv_max = np.array([116, 240, 158])
 
     pts1 = np.float32([[292, 172], [976, 172], [162, 652], [1086, 664]])  # Points on original image
-    pts2 = np.float32([[0, 0], [RESOLUTION_WIDTH, 0],
-                       [0, RESOLUTION_HEIGHT], [RESOLUTION_WIDTH, RESOLUTION_HEIGHT]])  # New output points
+    pts2 = np.float32([[0, 0], [RES_WIDTH, 0],
+                       [0, RES_HEIGHT], [RES_WIDTH, RES_HEIGHT]])  # New output points
     ct_matrix = cv2.getPerspectiveTransform(pts1, pts2)
 
     while run:
-        _, img = cap.read()
-        img_warped = cv2.warpPerspective(img, ct_matrix, (RESOLUTION_WIDTH, RESOLUTION_HEIGHT))
+        img, _ = read_camera(camera)
+
+        if not img:
+            continue
+
+        img_warped = cv2.warpPerspective(img, ct_matrix, (RES_WIDTH, RES_HEIGHT))
         hands, img_warped = detector.findHands(img_warped)
 
         img_hsv = cv2.cvtColor(img_warped, cv2.COLOR_BGR2HSV)
