@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 class CoordinateLogger:
     def __init__(self, name):
-        self.filename = f'block_coordinate_log_{name}'
+        self.filename = f'../block_coordinates/block_coordinate_log_{name}'
         self.filename_csv = self.filename + '.csv'
         self.filename_png = self.filename + '.png'
         self.filename_svg = self.filename + '.svg'

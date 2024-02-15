@@ -32,7 +32,7 @@ def detect():
         key = cv2.waitKey(1)
         if key == ord('q'):
             start_time_str = datetime.utcnow().strftime('%Y-%m-%dT%H-%M-%SZ')
-            filename = f'camera_transform_calibration_{start_time_str}.png'
+            filename = f'../camera_calibration/camera_transform_calibration_{start_time_str}.png'
             cv2.imwrite(filename, img_stack)
             break
 
