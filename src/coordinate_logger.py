@@ -63,4 +63,3 @@ class CoordinateLogger:
         plt.savefig(self.filename_png)
         plt.savefig(self.filename_svg)
         plt.show()
-
