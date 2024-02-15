@@ -1,27 +1,19 @@
 import numpy as np
 import cv2
-import pykinect_azure as pykinect
 
 from config import RES_HEIGHT, RES_WIDTH
 from opencv_helper_functions import stack_images, get_contours
 from coordinate_logger import CoordinateLogger
+from pykinect_helper_functions import initialise_camera, read_camera
 
 
 def camera_thread():
     run = True
-    coordinate_logger = CoordinateLogger()
+    print('Input block location')
+    location = input()
+    coordinate_logger = CoordinateLogger(location)
 
-    # Initialize the library, if the library is not found, add the library path as argument
-    pykinect.initialize_libraries()
-
-    # Modify camera configuration
-    device_config = pykinect.default_configuration
-    device_config.color_format = pykinect.K4A_IMAGE_FORMAT_COLOR_BGRA32
-    device_config.color_resolution = pykinect.K4A_COLOR_RESOLUTION_720P
-    device_config.depth_mode = pykinect.K4A_DEPTH_MODE_WFOV_2X2BINNED
-
-    # Start device
-    device = pykinect.start_device(config=device_config)
+    camera = initialise_camera()
 
     # Set the HSV values
     blue_block_hsv_min = np.array([100, 94, 71])
@@ -33,26 +25,13 @@ def camera_thread():
     ct_matrix = cv2.getPerspectiveTransform(pts1, pts2)
 
     while run:
-        # Get capture
-        capture = device.update()
+        img, img_depth = read_camera(camera)
 
-        # Get the color image from the capture
-        ret_color, color_image = capture.get_color_image()
-
-        # Get the colored depth
-        ret_depth, transformed_depth_image = capture.get_transformed_depth_image()
-
-        if not ret_color or not ret_depth:
+        if isinstance(img, bool):
             continue
 
-        img = np.zeros((720, 1280, 3), dtype='uint8')
-        r, g, b = color_image[:, :, 0], color_image[:, :, 1], color_image[:, :, 2]
-        img[:, :, 0] = r
-        img[:, :, 1] = g
-        img[:, :, 2] = b
-
         img_warped = cv2.warpPerspective(img, ct_matrix, (RES_WIDTH, RES_HEIGHT))
-        img_warped_depth = cv2.warpPerspective(transformed_depth_image, ct_matrix, (RES_WIDTH, RES_HEIGHT))
+        img_warped_depth = cv2.warpPerspective(img_depth, ct_matrix, (RES_WIDTH, RES_HEIGHT))
         img_hsv = cv2.cvtColor(img_warped, cv2.COLOR_BGR2HSV)
 
         blue_block_mask = cv2.inRange(img_hsv, blue_block_hsv_min, blue_block_hsv_max)
@@ -65,7 +44,7 @@ def camera_thread():
             contour = contours[0]
             block_centre = [contour[0] + contour[2] // 2, contour[1] + contour[3] // 2]
             block_depth = img_warped_depth[block_centre[1], block_centre[0]]
-            coordinate_logger.append_coordinates(block_centre, block_depth)
+            run = coordinate_logger.append_coordinates(block_centre, block_depth)
 
         img_stack = stack_images(0.5,
                                  [[img_contour]])
@@ -75,7 +54,8 @@ def camera_thread():
         key = cv2.waitKey(1)
         if key == ord('q'):
             run = False
-            coordinate_logger.log_coordinates()
+
+        if not run:
             coordinate_logger.graph_coordinates()
 
 

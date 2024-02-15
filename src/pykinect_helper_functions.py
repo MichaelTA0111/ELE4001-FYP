@@ -26,7 +26,7 @@ def read_camera(camera):
     ret_depth, transformed_depth_image = capture.get_transformed_depth_image()
 
     if not ret_color or not ret_depth:
-        return False
+        return False, False
 
     img = np.zeros((720, 1280, 3), dtype='uint8')
     r, g, b = color_image[:, :, 0], color_image[:, :, 1], color_image[:, :, 2]

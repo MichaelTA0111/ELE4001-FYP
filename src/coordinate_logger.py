@@ -1,12 +1,10 @@
-from datetime import datetime
 import csv
 import matplotlib.pyplot as plt
 
 
 class CoordinateLogger:
-    def __init__(self):
-        start_time_str = datetime.utcnow().strftime('%Y-%m-%dT%H-%M-%SZ')
-        self.filename = f'block_coordinate_log_{start_time_str}'
+    def __init__(self, name):
+        self.filename = f'block_coordinate_log_{name}'
         self.filename_csv = self.filename + '.csv'
         self.filename_png = self.filename + '.png'
         self.filename_svg = self.filename + '.svg'
@@ -24,15 +22,18 @@ class CoordinateLogger:
             if do_print:
                 print('Coordinates logged successfully')
 
-    def append_coordinates(self, xy, depth, do_print=False):
+    def append_coordinates(self, xy, depth, continue_on_log=False, do_print=False):
         coordinate_str = f'{xy[0]},{xy[1]},{depth}\n'
         self.coordinate_list.append(coordinate_str)
 
         if do_print and not len(self.coordinate_list) % 10:
             print(f'Appended {len(self.coordinate_list)} items')
 
-        if len(self.coordinate_list) >= 50:
+        if len(self.coordinate_list) >= 200:
             self.log_coordinates(do_print=do_print)
+            return continue_on_log
+
+        return True
 
     def graph_coordinates(self):
         coordinates = []
@@ -51,7 +52,9 @@ class CoordinateLogger:
 
         # Plot x, y, and depth against index
         for i in range(3):
-            axes[i].plot(range(len(coordinates)), [coord[i] for coord in coordinates])
+            axes[i].plot(range(len(coordinates)), [int(coord[i]) for coord in coordinates])
+            axes[i].yaxis.set_major_locator(plt.MaxNLocator(integer=True))  # Set y-axis ticks to integers
+
         axes[0].set_title('x-ordinate over time')
         axes[1].set_title('y-ordinate over time')
         axes[2].set_title('Depth over time')
