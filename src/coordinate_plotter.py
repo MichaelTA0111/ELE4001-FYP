@@ -62,19 +62,22 @@ def plot(plot_data):
         axes[i].set_xlabel('Position')
 
     axes[0].errorbar(range(1, plot_data.num_files+1), x_mean, x_std,
-                     linestyle='None', marker='x', label='x', capsize=5, elinewidth=1)
+                     linestyle='None', marker='x', label='x', capsize=5, elinewidth=1, ecolor='red')
     axes[0].set_title('x Value against Position')
     axes[0].set_ylabel('x Value')
+    axes[0].set_ylim([0, 1280])
 
     axes[1].errorbar(range(1, plot_data.num_files+1), y_mean, y_std,
-                     linestyle='None', marker='x', label='y', capsize=5, elinewidth=1)
+                     linestyle='None', marker='x', label='y', capsize=5, elinewidth=1, ecolor='red')
     axes[1].set_title('y Value against Position')
     axes[1].set_ylabel('y Value')
+    axes[1].set_ylim([0, 720])
 
     axes[2].errorbar(range(1, plot_data.num_files+1), depth_mean, depth_std,
-                     linestyle='None', marker='x', label='Depth', capsize=5, elinewidth=1)
+                     linestyle='None', marker='x', label='Depth', capsize=5, elinewidth=1, ecolor='red')
     axes[2].set_title('Depth against Position')
     axes[2].set_ylabel('Depth')
+    axes[2].set_ylim([0, 600])
 
     plt.tight_layout()
     plt.savefig(f'{plot_data.base_filename}.png')
@@ -113,19 +116,22 @@ def plot_all():
         axes[i].set_xlabel('Position')
 
     axes[0].errorbar(range(1, PlotData.ALL.num_files+1), x_mean, x_std,
-                     linestyle='None', marker='x', label='x', capsize=5, elinewidth=1)
+                     linestyle='None', marker='x', label='x', capsize=5, elinewidth=1, ecolor='red')
     axes[0].set_title('x Value against Position')
     axes[0].set_ylabel('x Value')
+    axes[0].set_ylim([0, 1280])
 
     axes[1].errorbar(range(1, PlotData.ALL.num_files+1), y_mean, y_std,
-                     linestyle='None', marker='x', label='y', capsize=5, elinewidth=1)
+                     linestyle='None', marker='x', label='y', capsize=5, elinewidth=1, ecolor='red')
     axes[1].set_title('y Value against Position')
     axes[1].set_ylabel('y Value')
+    axes[1].set_ylim([0, 720])
 
     axes[2].errorbar(range(1, PlotData.ALL.num_files+1), depth_mean, depth_std,
-                     linestyle='None', marker='x', label='Depth', capsize=5, elinewidth=1)
+                     linestyle='None', marker='x', label='Depth', capsize=5, elinewidth=1, ecolor='red')
     axes[2].set_title('Depth against Position')
     axes[2].set_ylabel('Depth')
+    axes[2].set_ylim([0, 600])
 
     plt.tight_layout()
     plt.savefig(f'{PlotData.ALL.base_filename}.png')
