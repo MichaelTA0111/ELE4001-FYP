@@ -7,7 +7,7 @@ from wlkata_mirobot import WlkataMirobot
 from cvzone.HandTrackingModule import HandDetector
 
 from config import MIROBOT_PORT, RES_HEIGHT, RES_WIDTH
-from opencv_helper_functions import stack_images, get_contours
+from opencv_helper_functions import ContourSize, stack_images, get_contours
 from pykinect_helper_functions import initialise_camera, read_camera
 
 
@@ -17,17 +17,12 @@ run = True
 detector = HandDetector(detectionCon=0.8, maxHands=1)
 
 
-def map_coords(img_coords, z=70):
+def map_coords(img_coords):
     """
     Convert image coordinates to end-effector coordinates
     :param img_coords: List of x and y coordinates from the image
-    :param z: The z-ordinate of the object being parsed from the image
     :return: List of x and y coordinates for the robot end-effector
     """
-    # TODO: account for variable height, required for hand heights
-    z_eq = 70
-    z_bar = z - z_eq
-
     # Note the x and y ordinates from the image map to the y and x ordinates of the end effector respectively
     # Note the x ordinate is scaled from 9 to 250 instead of 0 to 250 to account for an offset
     ee_coords = [np.interp(img_coords[1], [166, 604], [9, 250]),
@@ -46,18 +41,19 @@ def camera_thread():
     # Set the HSV values
     blue_dot_hsv_min = np.array([107, 49, 93])
     blue_dot_hsv_max = np.array([124, 240, 198])
+    orange_ee_hsv_min = np.array([2, 185, 73])
+    orange_ee_hsv_max = np.array([27, 255, 255])
     blue_block_hsv_min = np.array([100, 94, 71])
     blue_block_hsv_max = np.array([116, 240, 158])
 
     pts1 = np.float32([[292, 172], [976, 172], [162, 652], [1086, 664]])  # Points on original image
-    pts2 = np.float32([[0, 0], [RES_WIDTH, 0],
-                       [0, RES_HEIGHT], [RES_WIDTH, RES_HEIGHT]])  # New output points
+    pts2 = np.float32([[0, 0], [RES_WIDTH, 0], [0, RES_HEIGHT], [RES_WIDTH, RES_HEIGHT]])  # New output points
     ct_matrix = cv2.getPerspectiveTransform(pts1, pts2)
 
     while run:
         img, _ = read_camera(camera)
 
-        if not img:
+        if isinstance(img, bool):
             continue
 
         img_warped = cv2.warpPerspective(img, ct_matrix, (RES_WIDTH, RES_HEIGHT))
@@ -69,17 +65,29 @@ def camera_thread():
         img_dot_resultant = cv2.bitwise_and(img_warped, img_warped, mask=blue_dot_mask)
         img_dot_canny = cv2.Canny(img_dot_resultant, 50, 50)
 
+        orange_ee_mask = cv2.inRange(img_hsv, orange_ee_hsv_min, orange_ee_hsv_max)
+        img_ee_resultant = cv2.bitwise_and(img_warped, img_warped, mask=orange_ee_mask)
+        img_ee_canny = cv2.Canny(img_ee_resultant, 50, 50)
+
         blue_block_mask = cv2.inRange(img_hsv, blue_block_hsv_min, blue_block_hsv_max)
         img_block_resultant = cv2.bitwise_and(img_warped, img_warped, mask=blue_block_mask)
         img_block_canny = cv2.Canny(img_block_resultant, 50, 50)
 
         img_contour = img_warped.copy()
 
-        # Only parse the end effector position if 1 dot is found
-        if (contours := get_contours(img_dot_canny, img_contour, small=True)) and len(contours) == 1:
-            contour = contours[0]
-            ee_pos = [contour[0] + contour[2] // 2, contour[1] + contour[3] // 2]
-            print(ee_pos)
+        # Only parse the end effector dot position if 1 dot is found
+        if ((dots := get_contours(img_dot_canny, img_contour, size=ContourSize.SMALL)) and
+                (ee := get_contours(img_ee_canny, img_contour, size=ContourSize.LARGE)) and len(ee) == 1):
+            ee = ee[0]
+            for dot in dots:
+                dot_pos = [dot[0] + dot[2] // 2, dot[1] + dot[3] // 2]
+                ee_x = [ee[0], ee[0] + ee[2]]
+                ee_y = [ee[1], ee[1] + ee[3]]
+
+                if dot_pos[0] > ee_x[0] and dot_pos[0] < ee_x[1] and dot_pos[1] > ee_y[0] and dot_pos[1] < ee_y[1]:
+                    ee_pos = dot_pos
+                    print(f'EE dot found at {ee_pos}')
+                    break
 
         # Only parse the block coordinates if 1 block is found
         if (contours := get_contours(img_block_canny, img_contour)) and len(contours) == 1:
@@ -93,11 +101,11 @@ def camera_thread():
             hand_centre = list(hand.get('center'))
             ee_coords[1] = map_coords(hand_centre)
 
-        img_stack = stack_images(0.5,
-                                 [[img_warped, img_hsv, blue_dot_mask],
-                                  [img_dot_resultant, img_dot_canny, img_contour]])
+        # img_stack = stack_images(0.5,
+        #                          [[img_warped, img_hsv, blue_dot_mask],
+        #                           [img_dot_resultant, img_dot_canny, img_contour]])
 
-        cv2.imshow('Image Stack', img_stack)
+        cv2.imshow('Image Stack', img_contour)
 
         key = cv2.waitKey(1)
         if key == ord('q'):

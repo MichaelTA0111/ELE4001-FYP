@@ -1,5 +1,13 @@
+from enum import Enum
+
 import cv2
 import numpy as np
+
+
+class ContourSize(Enum):
+    SMALL = 0
+    MEDIUM = 1
+    LARGE = 2
 
 
 def stack_grid(scale, images):
@@ -68,20 +76,21 @@ def draw_contour(img, c):
     return [x, y, w, h]
 
 
-def get_contours(img_src, img_dst, small=False):
+def get_contours(img_src, img_dst, size=ContourSize.MEDIUM):
     contours, hierarchy = cv2.findContours(img_src, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
     positions = []
 
     for c in contours:
         area = cv2.contourArea(c)
+        # print(area)
 
-        if area > 1500 and not small:
+        if size is ContourSize.SMALL and 100 < area <= 1500:
             positions.append(draw_contour(img_dst, c))
-            # print(area)
-        elif 100 < area <= 1500 and small:
+        elif size is ContourSize.MEDIUM and 1500 < area <= 2500:
             positions.append(draw_contour(img_dst, c))
-            # print(area)
+        elif size is ContourSize.LARGE and 2500 < area:
+            positions.append(draw_contour(img_dst, c))
 
     return positions
 
