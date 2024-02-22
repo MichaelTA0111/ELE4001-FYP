@@ -6,8 +6,9 @@ import cv2
 from wlkata_mirobot import WlkataMirobot
 from cvzone.HandTrackingModule import HandDetector
 
-from config import MIROBOT_PORT, RESOLUTION_HEIGHT, RESOLUTION_WIDTH
+from config import MIROBOT_PORT, RES_HEIGHT, RES_WIDTH
 from opencv_helper_functions import stack_images, get_contours
+from pykinect_helper_functions import initialise_camera, read_camera
 
 
 ee_coords = [[], []]
@@ -15,17 +16,12 @@ run = True
 detector = HandDetector(detectionCon=0.8, maxHands=1)
 
 
-def map_coords(img_coords, z=70):
+def map_coords(img_coords):
     """
     Convert image coordinates to end-effector coordinates
     :param img_coords: List of x and y coordinates from the image
-    :param z: The z-ordinate of the object being parsed from the image
     :return: List of x and y coordinates for the robot end-effector
     """
-    # TODO: account for variable height, required for hand heights
-    z_eq = 70
-    z_bar = z - z_eq
-
     # Note the x and y ordinates from the image map to the y and x ordinates of the end effector respectively
     # Note the x ordinate is scaled from 9 to 250 instead of 0 to 250 to account for an offset
     ee_coords = [np.interp(img_coords[1], [166, 604], [9, 250]),
@@ -39,24 +35,23 @@ def map_coords(img_coords, z=70):
 def camera_thread():
     global ee_coords, run, detector
 
-    # Set up camera feed
-    cap = cv2.VideoCapture(0)
-    cap.set(3, RESOLUTION_WIDTH)
-    cap.set(4, RESOLUTION_HEIGHT)
-    cap.set(cv2.CAP_PROP_FPS, 5)
+    camera = initialise_camera()
 
     # Set the HSV values
     blue_hsv_min = np.array([100, 94, 71])
     blue_hsv_max = np.array([116, 240, 158])
 
     pts1 = np.float32([[292, 172], [976, 172], [162, 652], [1086, 664]])  # Points on original image
-    pts2 = np.float32([[0, 0], [RESOLUTION_WIDTH, 0],
-                       [0, RESOLUTION_HEIGHT], [RESOLUTION_WIDTH, RESOLUTION_HEIGHT]])  # New output points
+    pts2 = np.float32([[0, 0], [RES_WIDTH, 0], [0, RES_HEIGHT], [RES_WIDTH, RES_HEIGHT]])  # New output points
     ct_matrix = cv2.getPerspectiveTransform(pts1, pts2)
 
     while run:
-        _, img = cap.read()
-        img_warped = cv2.warpPerspective(img, ct_matrix, (RESOLUTION_WIDTH, RESOLUTION_HEIGHT))
+        img, _ = read_camera(camera)
+
+        if isinstance(img, bool):
+            continue
+
+        img_warped = cv2.warpPerspective(img, ct_matrix, (RES_WIDTH, RES_HEIGHT))
         hands, img_warped = detector.findHands(img_warped)
 
         img_hsv = cv2.cvtColor(img_warped, cv2.COLOR_BGR2HSV)
