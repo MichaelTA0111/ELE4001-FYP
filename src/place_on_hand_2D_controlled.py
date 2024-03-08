@@ -72,6 +72,14 @@ def camera_thread():
         img_ee_resultant = cv2.bitwise_and(img_warped, img_warped, mask=orange_ee_mask)
         img_ee_canny = cv2.Canny(img_ee_resultant, 50, 50)
 
+        # Apply dilation to img_ee_canny
+        kernel_dilate = np.ones((5, 5), np.uint8)
+        img_ee_canny_dilated = cv2.dilate(img_ee_canny, kernel_dilate, iterations=1)
+
+        # Apply erosion to img_ee_canny
+        kernel_erode = np.ones((3, 3), np.uint8)
+        img_ee_canny_eroded = cv2.erode(img_ee_canny_dilated, kernel_erode, iterations=1)
+
         blue_block_mask = cv2.inRange(img_hsv, blue_block_hsv_min, blue_block_hsv_max)
         img_block_resultant = cv2.bitwise_and(img_warped, img_warped, mask=blue_block_mask)
         img_block_canny = cv2.Canny(img_block_resultant, 50, 50)
@@ -80,7 +88,7 @@ def camera_thread():
 
         # Only parse the end effector dot position if 1 dot is found
         if ((dots := get_contours(img_dot_canny, img_contour, size=ContourSize.SMALL)) and
-                (ee := get_contours(img_ee_canny, img_contour, size=ContourSize.LARGE)) and len(ee) == 1):
+                (ee := get_contours(img_ee_canny_eroded, img_contour, size=ContourSize.LARGE)) and len(ee) == 1):
             ee = ee[0]
             for dot in dots:
                 dot_pos = [dot[0] + dot[2] // 2, dot[1] + dot[3] // 2]
@@ -97,11 +105,11 @@ def camera_thread():
             contour = contours[0]
             block_centre = [contour[0] + contour[2] // 2, contour[1] + contour[3] // 2]
             block_coords = map_coords(block_centre)
-            print(f'Block found at {block_centre}')
+            # print(f'Block found at {block_centre}')
 
         if ee_coords and block_coords:
             x_error_px = ee_coords[0] - block_coords[0]
-            print(f'x error: {x_error_px} px')
+            # print(f'x error: {x_error_px} px')
 
             y_error_mm = x_error_px * 0.484
 
@@ -115,11 +123,12 @@ def camera_thread():
             hand_coords = map_coords(hand_centre)
             print(f'Hand found at {hand_centre}')
 
-        # img_stack = stack_images(0.5,
-        #                          [[img_warped, img_hsv, blue_dot_mask],
-        #                           [img_dot_resultant, img_dot_canny, img_contour]])
+        img_stack = stack_images(0.5,
+                                 [[img_warped, img_hsv, orange_ee_mask],
+                                  [img_ee_resultant, img_ee_canny_eroded, img_contour]])
 
-        cv2.imshow('Image Stack', img_contour)
+        cv2.imshow('Image Stack', img_stack)
+        # cv2.imshow('Image Stack', img_contour)
 
         key = cv2.waitKey(1)
         if key == ord('c'):
