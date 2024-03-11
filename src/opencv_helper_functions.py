@@ -77,7 +77,7 @@ def draw_contour(img, c):
 
 
 def get_contours(img_src, img_dst, size=ContourSize.MEDIUM):
-    contours, hierarchy = cv2.findContours(img_src, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    contours, hierarchy = cv2.findContours(img_src, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_KCOS)
 
     positions = []
 
@@ -89,7 +89,7 @@ def get_contours(img_src, img_dst, size=ContourSize.MEDIUM):
             positions.append(draw_contour(img_dst, c))
         elif size is ContourSize.MEDIUM and 1500 < area <= 2500:
             positions.append(draw_contour(img_dst, c))
-        elif size is ContourSize.LARGE and 2500 < area:
+        elif size is ContourSize.LARGE and 1500 < area:
             positions.append(draw_contour(img_dst, c))
 
     return positions

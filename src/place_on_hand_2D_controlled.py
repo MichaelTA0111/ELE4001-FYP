@@ -9,35 +9,19 @@ from cvzone.HandTrackingModule import HandDetector
 from config import MIROBOT_PORT, RES_HEIGHT, RES_WIDTH
 from opencv_helper_functions import ContourSize, stack_images, get_contours
 from pykinect_helper_functions import initialise_camera, read_camera
+from coordinate_systems import ObjectType, ObjectCoordinates
 
 
-block_coords = []
-hand_coords = []
-y_error_mm = 0
+coords = ObjectCoordinates()
 run = True
-waiting = True
+y_error_block = None
+y_error_hand = None
 detector = HandDetector(detectionCon=0.8, maxHands=1)
-
-
-def map_coords(img_coords):
-    """
-    Convert image coordinates to end-effector coordinates
-    :param img_coords: List of x and y coordinates from the image
-    :return: List of x and y coordinates for the robot end-effector
-    """
-    # Note the x and y ordinates from the image map to the y and x ordinates of the end effector respectively
-    # Note the x ordinate is scaled from 9 to 250 instead of 0 to 250 to account for an offset
-    target_coords = [np.interp(img_coords[1], [166, 604], [9, 250]),
-                     np.interp(img_coords[0], [132, 1152], [-250, 250])]
-
-    # Account for offset of end-effector position due to the gripper being asymmetrical,
-    # i.e. Add 0 to x-ordinate, subtract 14 from y-ordinate
-    return [target_coords[0] + 0, target_coords[1] - 14]
+start_time = None
 
 
 def camera_thread():
-    global block_coords, hand_coords, run, waiting, detector, y_error_mm
-    ee_coords = []
+    global coords, run, y_error_block, y_error_hand, detector, start_time
 
     camera = initialise_camera()
 
@@ -52,6 +36,9 @@ def camera_thread():
     pts1 = np.float32([[292, 172], [976, 172], [162, 652], [1086, 664]])  # Points on original image
     pts2 = np.float32([[0, 0], [RES_WIDTH, 0], [0, RES_HEIGHT], [RES_WIDTH, RES_HEIGHT]])  # New output points
     ct_matrix = cv2.getPerspectiveTransform(pts1, pts2)
+
+    waiting = True
+    start_time = time.time()
 
     while run:
         img, _ = read_camera(camera)
@@ -91,37 +78,30 @@ def camera_thread():
                 (ee := get_contours(img_ee_canny_eroded, img_contour, size=ContourSize.LARGE)) and len(ee) == 1):
             ee = ee[0]
             for dot in dots:
-                dot_pos = [dot[0] + dot[2] // 2, dot[1] + dot[3] // 2]
+                dot_x = dot[0] + dot[2] // 2
+                dot_y = dot[1] + dot[3] // 2
                 ee_x = [ee[0], ee[0] + ee[2]]
                 ee_y = [ee[1], ee[1] + ee[3]]
 
-                if ee_x[0] < dot_pos[0] < ee_x[1] and ee_y[0] < dot_pos[1] < ee_y[1]:
-                    ee_coords = dot_pos
-                    print(f'EE dot found at {ee_coords}')
+                if ee_x[0] < dot_x < ee_x[1] and ee_y[0] < dot_y < ee_y[1]:
+                    coords.ee.update(dot_x, dot_y)
+                    # print(f'EE dot found at {coords.ee.img}')
                     break
 
         # Only parse the block coordinates if 1 block is found
         if (contours := get_contours(img_block_canny, img_contour)) and len(contours) == 1:
             contour = contours[0]
-            block_centre = [contour[0] + contour[2] // 2, contour[1] + contour[3] // 2]
-            block_coords = map_coords(block_centre)
-            # print(f'Block found at {block_centre}')
-
-        if ee_coords and block_coords:
-            x_error_px = ee_coords[0] - block_coords[0]
-            # print(f'x error: {x_error_px} px')
-
-            y_error_mm = x_error_px * 0.484
-
-            # Account for gripper offset
-            y_error_mm += 10
+            block_x = contour[0] + contour[2] // 2
+            block_y = contour[1] + contour[3] // 2
+            coords.block.update(block_x, block_y)
+            # print(f'Block found at {coords.block.img}')
 
         # Only parse the hand coordinates if 1 hand is found
         if hands and len(hands) == 1:
             hand = hands[0]
             hand_centre = list(hand.get('center'))
-            hand_coords = map_coords(hand_centre)
-            print(f'Hand found at {hand_centre}')
+            coords.hand.update(hand_centre[0], hand_centre[1])
+            # print(f'Hand found at {coords.hand.img}')
 
         img_stack = stack_images(0.5,
                                  [[img_warped, img_hsv, orange_ee_mask],
@@ -131,15 +111,21 @@ def camera_thread():
         # cv2.imshow('Image Stack', img_contour)
 
         key = cv2.waitKey(1)
-        if key == ord('c'):
-            print('Beginning to move arm')
-            waiting = False
         if key == ord('q'):
-            run = False
+            waiting = False
+
+        if not waiting:
+            end_time = time.time()
+            if end_time - start_time > 10:
+                y_error_block = coords.calculate_y_error(ObjectType.BLOCK)
+                y_error_hand = coords.calculate_y_error(ObjectType.HAND)
+
+            if y_error_block is not None and y_error_hand is not None:
+                run = False
 
 
 def arm_thread():
-    global block_coords, hand_coords, run, waiting, y_error_mm
+    global coords, run, y_error_block, y_error_hand, start_time
 
     print('Arm Starting')
 
@@ -149,62 +135,64 @@ def arm_thread():
 
     # Wait until the camera thread is stopped
     while run:
-        if waiting:
+        if y_error_block is None or y_error_hand is None:
             continue
 
-        y_corrected = False
-        while not y_corrected:
-            # Account for gripper offset
-            if y_error_mm - 10 > 3:
-                # Figure out how to move robot y according to mm scale
-                pass
-            else:
-                y_corrected = True
+        # print(f'{y_error_block = }')
+        # print(f'{y_error_hand = }')
 
-        if block_coords and hand_coords:
-            print(f'Successfully found a block at {block_coords} and a hand at {hand_coords}!')
+        arm_status = arm.get_status()
+        arm_coords = arm_status.cartesian
+        arm_x = arm_coords.x
+        arm_y = arm_coords.y
+        arm_z = arm_coords.z
 
-            print(f'Moving above source block')
-            arm.p2p_interpolation(block_coords[0], block_coords[1], 130, 0, 0, 0)
-            time.sleep(1)
+        robot_x, robot_y = coords.calculate_robot_coordinates(ObjectType.BLOCK, arm_y, y_error_block)
 
-            print('Adjusting robot y ordinate')
+        print(f'Moving above source block')
+        arm.p2p_interpolation(robot_x, robot_y, arm_z, 0, 0, 0)
 
-            print(f'Opening gripper')
-            arm.gripper_open()
-            time.sleep(1)
+        # y_error = None
+        # coords.ee.reset()
+        # start_time = time.time()
 
-            print(f'Moving to source block')
-            arm.p2p_interpolation(block_coords[0], block_coords[1], 70, 0, 0, 0)
-            time.sleep(1)
+        print(f'Opening gripper')
+        arm.gripper_open()
+        time.sleep(1)
 
-            print(f'Picking up source block')
-            arm.gripper_close()
-            time.sleep(1)
+        print(f'Moving to source block')
+        arm.p2p_interpolation(robot_x, robot_y, 70, 0, 0, 0)
+        time.sleep(1)
 
-            print(f'Lifting source block')
-            arm.p2p_interpolation(block_coords[0], block_coords[1], 130, 0, 0, 0)
-            time.sleep(1)
+        print(f'Picking up source block')
+        arm.gripper_close()
+        time.sleep(1)
 
-            print(f'Moving above destination block')
-            arm.p2p_interpolation(hand_coords[0], hand_coords[1], 130, 0, 0, 0)
-            time.sleep(1)
+        print(f'Lifting source block')
+        arm.p2p_interpolation(arm_x, arm_y, arm_z, 0, 0, 0)
+        time.sleep(1)
 
-            print(f'Setting on destination block')
-            arm.p2p_interpolation(hand_coords[0], hand_coords[1], 105, 0, 0, 0)
-            time.sleep(1)
+        robot_x, robot_y = coords.calculate_robot_coordinates(ObjectType.HAND, arm_y, y_error_hand)
 
-            print(f'Releasing down source block')
-            arm.gripper_open()
-            time.sleep(1)
+        print(f'Moving above destination block')
+        arm.p2p_interpolation(robot_x, robot_y, arm_z, 0, 0, 0)
+        time.sleep(1)
 
-            print(f'Moving above destination block')
-            arm.p2p_interpolation(hand_coords[0], hand_coords[1], 130, 0, 0, 0)
-            time.sleep(1)
+        print(f'Setting on destination block')
+        arm.p2p_interpolation(robot_x, robot_y, 105, 0, 0, 0)
+        time.sleep(1)
 
-            print(f'Closing gripper')
-            arm.gripper_close()
-            time.sleep(1)
+        print(f'Releasing down source block')
+        arm.gripper_open()
+        time.sleep(1)
+
+        print(f'Moving above destination block')
+        arm.p2p_interpolation(robot_x, robot_y, 130, 0, 0, 0)
+        time.sleep(1)
+
+        print(f'Closing gripper')
+        arm.gripper_close()
+        time.sleep(1)
 
     arm.home()
 
