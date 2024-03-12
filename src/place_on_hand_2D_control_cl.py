@@ -4,24 +4,22 @@ from threading import Thread
 import numpy as np
 import cv2
 from wlkata_mirobot import WlkataMirobot
-from cvzone.HandTrackingModule import HandDetector
 
 from config import MIROBOT_PORT, RES_HEIGHT, RES_WIDTH
 from opencv_helper_functions import ContourSize, stack_images, get_contours
 from pykinect_helper_functions import initialise_camera, read_camera
-from coordinate_systems import ObjectType, ObjectCoordinates
+from coordinate_systems_cl import ObjectType, ObjectCoordinates
 
 
 coords = ObjectCoordinates()
 run = True
-y_error_block = None
-y_error_hand = None
-detector = HandDetector(detectionCon=0.8, maxHands=1)
+x_error = None
+y_error = None
 start_time = None
 
 
 def camera_thread():
-    global coords, run, y_error_block, y_error_hand, detector, start_time
+    global coords, run, x_error, y_error, start_time
 
     camera = initialise_camera()
 
@@ -47,8 +45,6 @@ def camera_thread():
             continue
 
         img_warped = cv2.warpPerspective(img, ct_matrix, (RES_WIDTH, RES_HEIGHT))
-        hands, img_warped = detector.findHands(img_warped)
-
         img_hsv = cv2.cvtColor(img_warped, cv2.COLOR_BGR2HSV)
 
         blue_dot_mask = cv2.inRange(img_hsv, blue_dot_hsv_min, blue_dot_hsv_max)
@@ -96,19 +92,12 @@ def camera_thread():
             coords.block.update(block_x, block_y)
             # print(f'Block found at {coords.block.img}')
 
-        # Only parse the hand coordinates if 1 hand is found
-        if hands and len(hands) == 1:
-            hand = hands[0]
-            hand_centre = list(hand.get('center'))
-            coords.hand.update(hand_centre[0], hand_centre[1])
-            # print(f'Hand found at {coords.hand.img}')
-
-        img_stack = stack_images(0.5,
-                                 [[img_warped, img_hsv, orange_ee_mask],
-                                  [img_ee_resultant, img_ee_canny_eroded, img_contour]])
-
-        cv2.imshow('Image Stack', img_stack)
-        # cv2.imshow('Image Stack', img_contour)
+        # img_stack = stack_images(0.5,
+        #                          [[img_warped, img_hsv, orange_ee_mask],
+        #                           [img_ee_resultant, img_ee_canny_eroded, img_contour]])
+        #
+        # cv2.imshow('Image Stack', img_stack)
+        cv2.imshow('Image Stack', img_contour)
 
         key = cv2.waitKey(1)
         if key == ord('q'):
@@ -117,15 +106,12 @@ def camera_thread():
         if not waiting:
             end_time = time.time()
             if end_time - start_time > 10:
-                y_error_block = coords.calculate_y_error(ObjectType.BLOCK)
-                y_error_hand = coords.calculate_y_error(ObjectType.HAND)
-
-            if y_error_block is not None and y_error_hand is not None:
-                run = False
+                x_error = coords.calculate_x_error()
+                y_error = coords.calculate_y_error()
 
 
 def arm_thread():
-    global coords, run, y_error_block, y_error_hand, start_time
+    global coords, run, x_error, y_error, start_time
 
     print('Arm Starting')
 
@@ -135,11 +121,11 @@ def arm_thread():
 
     # Wait until the camera thread is stopped
     while run:
-        if y_error_block is None or y_error_hand is None:
+        if x_error is None or y_error is None:
             continue
 
-        # print(f'{y_error_block = }')
-        # print(f'{y_error_hand = }')
+        print(f'{x_error = }')
+        print(f'{y_error = }')
 
         arm_status = arm.get_status()
         arm_coords = arm_status.cartesian
@@ -147,52 +133,20 @@ def arm_thread():
         arm_y = arm_coords.y
         arm_z = arm_coords.z
 
-        robot_x, robot_y = coords.calculate_robot_coordinates(ObjectType.BLOCK, arm_y, y_error_block)
+        robot_x = coords.calculate_robot_x(arm_x, x_error)
+        robot_y = coords.calculate_robot_y(arm_y, y_error)
 
         print(f'Moving above source block')
         arm.p2p_interpolation(robot_x, robot_y, arm_z, 0, 0, 0)
 
-        # y_error = None
-        # coords.ee.reset()
-        # start_time = time.time()
+        if abs(x_error) < 2 and abs(y_error) < 2:
+            print('Successfully reached target! Program terminating')
+            run = False
 
-        print(f'Opening gripper')
-        arm.gripper_open()
-        time.sleep(1)
-
-        print(f'Moving to source block')
-        arm.p2p_interpolation(robot_x, robot_y, 70, 0, 0, 0)
-        time.sleep(1)
-
-        print(f'Picking up source block')
-        arm.gripper_close()
-        time.sleep(1)
-
-        print(f'Lifting source block')
-        arm.p2p_interpolation(arm_x, arm_y, arm_z, 0, 0, 0)
-        time.sleep(1)
-
-        robot_x, robot_y = coords.calculate_robot_coordinates(ObjectType.HAND, arm_y, y_error_hand)
-
-        print(f'Moving above destination block')
-        arm.p2p_interpolation(robot_x, robot_y, arm_z, 0, 0, 0)
-        time.sleep(1)
-
-        print(f'Setting on destination block')
-        arm.p2p_interpolation(robot_x, robot_y, 105, 0, 0, 0)
-        time.sleep(1)
-
-        print(f'Releasing down source block')
-        arm.gripper_open()
-        time.sleep(1)
-
-        print(f'Moving above destination block')
-        arm.p2p_interpolation(robot_x, robot_y, 130, 0, 0, 0)
-        time.sleep(1)
-
-        print(f'Closing gripper')
-        arm.gripper_close()
-        time.sleep(1)
+        x_error = None
+        y_error = None
+        coords.ee.reset()
+        start_time = time.time()
 
     arm.home()
 
