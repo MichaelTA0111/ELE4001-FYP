@@ -37,6 +37,9 @@ def camera_thread():
     pts2 = np.float32([[0, 0], [RES_WIDTH, 0], [0, RES_HEIGHT], [RES_WIDTH, RES_HEIGHT]])  # New output points
     ct_matrix = cv2.getPerspectiveTransform(pts1, pts2)
 
+    kernel_dilate = np.ones((5, 5), np.uint8)
+    kernel_erode = np.ones((3, 3), np.uint8)
+
     waiting = True
     start_time = time.time()
 
@@ -55,26 +58,30 @@ def camera_thread():
         img_dot_resultant = cv2.bitwise_and(img_warped, img_warped, mask=blue_dot_mask)
         img_dot_canny = cv2.Canny(img_dot_resultant, 50, 50)
 
+        # Apply dilation and erosion to Canny image
+        img_dot_canny_dilated = cv2.dilate(img_dot_canny, kernel_dilate, iterations=1)
+        img_dot_canny_eroded = cv2.erode(img_dot_canny_dilated, kernel_erode, iterations=1)
+
         orange_ee_mask = cv2.inRange(img_hsv, orange_ee_hsv_min, orange_ee_hsv_max)
         img_ee_resultant = cv2.bitwise_and(img_warped, img_warped, mask=orange_ee_mask)
         img_ee_canny = cv2.Canny(img_ee_resultant, 50, 50)
 
-        # Apply dilation to img_ee_canny
-        kernel_dilate = np.ones((5, 5), np.uint8)
+        # Apply dilation and erosion to Canny image
         img_ee_canny_dilated = cv2.dilate(img_ee_canny, kernel_dilate, iterations=1)
-
-        # Apply erosion to img_ee_canny
-        kernel_erode = np.ones((3, 3), np.uint8)
         img_ee_canny_eroded = cv2.erode(img_ee_canny_dilated, kernel_erode, iterations=1)
 
         blue_block_mask = cv2.inRange(img_hsv, blue_block_hsv_min, blue_block_hsv_max)
         img_block_resultant = cv2.bitwise_and(img_warped, img_warped, mask=blue_block_mask)
         img_block_canny = cv2.Canny(img_block_resultant, 50, 50)
 
+        # Apply dilation and erosion to Canny image
+        img_block_canny_dilated = cv2.dilate(img_block_canny, kernel_dilate, iterations=1)
+        img_block_canny_eroded = cv2.erode(img_block_canny_dilated, kernel_erode, iterations=1)
+
         img_contour = img_warped.copy()
 
         # Only parse the end effector dot position if 1 dot is found
-        if ((dots := get_contours(img_dot_canny, img_contour, size=ContourSize.SMALL)) and
+        if ((dots := get_contours(img_dot_canny_eroded, img_contour, size=ContourSize.SMALL)) and
                 (ee := get_contours(img_ee_canny_eroded, img_contour, size=ContourSize.LARGE)) and len(ee) == 1):
             ee = ee[0]
             for dot in dots:
@@ -89,7 +96,7 @@ def camera_thread():
                     break
 
         # Only parse the block coordinates if 1 block is found
-        if (contours := get_contours(img_block_canny, img_contour)) and len(contours) == 1:
+        if (contours := get_contours(img_block_canny_eroded, img_contour)) and len(contours) == 1:
             contour = contours[0]
             block_x = contour[0] + contour[2] // 2
             block_y = contour[1] + contour[3] // 2

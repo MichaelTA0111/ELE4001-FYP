@@ -45,6 +45,9 @@ def camera_thread():
     pts2 = np.float32([[0, 0], [RES_WIDTH, 0], [0, RES_HEIGHT], [RES_WIDTH, RES_HEIGHT]])  # New output points
     ct_matrix = cv2.getPerspectiveTransform(pts1, pts2)
 
+    kernel_dilate = np.ones((5, 5), np.uint8)
+    kernel_erode = np.ones((3, 3), np.uint8)
+
     while run:
         img, _ = read_camera(camera)
 
@@ -59,10 +62,12 @@ def camera_thread():
         blue_mask = cv2.inRange(img_hsv, blue_hsv_min, blue_hsv_max)
         img_resultant = cv2.bitwise_and(img_warped, img_warped, mask=blue_mask)
         img_canny = cv2.Canny(img_resultant, 50, 50)
+        img_canny_dilated = cv2.dilate(img_canny, kernel_dilate, iterations=1)
+        img_canny_eroded = cv2.erode(img_canny_dilated, kernel_erode, iterations=1)
         img_contour = img_warped.copy()
 
         # Only parse the block coordinates if 1 block is found
-        if (contours := get_contours(img_canny, img_contour)) and len(contours) == 1:
+        if (contours := get_contours(img_canny_eroded, img_contour)) and len(contours) == 1:
             contour = contours[0]
             block_centre = [contour[0] + contour[2] // 2, contour[1] + contour[3] // 2]
             ee_coords[0] = map_coords(block_centre)
