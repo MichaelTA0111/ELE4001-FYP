@@ -79,11 +79,11 @@ class ObjectCoordinates:
         return y_error_mm
 
     def calculate_robot_x(self, x, x_error):
-        k_p = 0.5
+        k_p = 0.4
         return x - k_p * x_error
 
     def calculate_robot_y(self, y, y_error):
-        k_p = 0.5
+        k_p = 0.4
         return y - k_p * y_error
 
     @property

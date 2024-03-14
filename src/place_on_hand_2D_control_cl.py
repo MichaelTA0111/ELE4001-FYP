@@ -7,6 +7,7 @@ from wlkata_mirobot import WlkataMirobot
 
 from config import MIROBOT_PORT, RES_HEIGHT, RES_WIDTH
 from opencv_helper_functions import ContourSize, stack_images, get_contours, draw_cross
+from error_logger import ErrorLogger
 from pykinect_helper_functions import initialise_camera, read_camera
 from coordinate_systems_cl import ObjectCoordinates
 
@@ -16,12 +17,10 @@ run = True
 x_error = None
 y_error = None
 start_time = None
-cross_x = None
-cross_y = None
 
 
 def camera_thread():
-    global coords, run, x_error, y_error, start_time, cross_x, cross_y
+    global coords, run, x_error, y_error, start_time
 
     camera = initialise_camera()
 
@@ -40,6 +39,8 @@ def camera_thread():
     kernel_dilate = np.ones((5, 5), np.uint8)
     kernel_erode = np.ones((3, 3), np.uint8)
 
+    cross_x = None
+    cross_y = None
     waiting = True
     start_time = time.time()
 
@@ -113,9 +114,12 @@ def camera_thread():
 
         key = cv2.waitKey(1)
         if key == ord('q'):
-            waiting = False
-            cross_x = coords.block.img_x
-            cross_y = coords.block.img_y
+            if waiting:
+                waiting = False
+                cross_x = coords.block.img_x
+                cross_y = coords.block.img_y
+            else:
+                run = False
 
         if not waiting:
             end_time = time.time()
@@ -127,11 +131,13 @@ def camera_thread():
 def arm_thread():
     global coords, run, x_error, y_error, start_time
 
-    print('Arm Starting')
-
     arm = WlkataMirobot(portname=MIROBOT_PORT, debug=False, default_speed=20)
     # arm.gripper_close()
     arm.home()
+
+    print('Input block location and K_p')
+    location = input()
+    error_logger = ErrorLogger(location)
 
     # Wait until the camera thread is stopped
     while run:
@@ -140,6 +146,8 @@ def arm_thread():
 
         print(f'x error = {int(x_error)} px')
         print(f'y error = {int(y_error)} px')
+
+        error_logger.append_errors(int(x_error), int(y_error))
 
         if abs(int(x_error)) < 1 and abs(int(y_error)) < 1:
             print('Successfully reached target! Program terminating')
@@ -164,6 +172,8 @@ def arm_thread():
         coords.ee.reset()
         start_time = time.time()
 
+    error_logger.log_errors()
+    error_logger.graph_errors()
     arm.home()
 
 
