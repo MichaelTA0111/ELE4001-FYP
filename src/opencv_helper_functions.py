@@ -95,5 +95,16 @@ def get_contours(img_src, img_dst, size=ContourSize.MEDIUM):
     return positions
 
 
+def draw_cross(img, x, y):
+    # Define the color (BGR format)
+    color = (0, 0, 255)  # Red color
+
+    # Draw the vertical line
+    cv2.line(img, (x, 0), (x, img.shape[0]), color, thickness=2)
+
+    # Draw the horizontal line
+    cv2.line(img, (0, y), (img.shape[1], y), color, thickness=2)
+
+
 if __name__ == '__main__':
     print('Please run a different source file!')

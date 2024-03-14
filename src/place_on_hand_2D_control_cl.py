@@ -6,9 +6,9 @@ import cv2
 from wlkata_mirobot import WlkataMirobot
 
 from config import MIROBOT_PORT, RES_HEIGHT, RES_WIDTH
-from opencv_helper_functions import ContourSize, stack_images, get_contours
+from opencv_helper_functions import ContourSize, stack_images, get_contours, draw_cross
 from pykinect_helper_functions import initialise_camera, read_camera
-from coordinate_systems_cl import ObjectType, ObjectCoordinates
+from coordinate_systems_cl import ObjectCoordinates
 
 
 coords = ObjectCoordinates()
@@ -16,10 +16,12 @@ run = True
 x_error = None
 y_error = None
 start_time = None
+cross_x = None
+cross_y = None
 
 
 def camera_thread():
-    global coords, run, x_error, y_error, start_time
+    global coords, run, x_error, y_error, start_time, cross_x, cross_y
 
     camera = initialise_camera()
 
@@ -99,6 +101,9 @@ def camera_thread():
             coords.block.update(block_x, block_y)
             # print(f'Block found at {coords.block.img}')
 
+        if cross_x is not None and cross_y is not None:
+            draw_cross(img_contour, cross_x, cross_y)
+
         # img_stack = stack_images(0.5,
         #                          [[img_warped, img_hsv, orange_ee_mask],
         #                           [img_ee_resultant, img_ee_canny_eroded, img_contour]])
@@ -109,6 +114,8 @@ def camera_thread():
         key = cv2.waitKey(1)
         if key == ord('q'):
             waiting = False
+            cross_x = coords.block.img_x
+            cross_y = coords.block.img_y
 
         if not waiting:
             end_time = time.time()
@@ -131,8 +138,14 @@ def arm_thread():
         if x_error is None or y_error is None:
             continue
 
-        print(f'{x_error = } px')
-        print(f'{y_error = } px')
+        print(f'x error = {int(x_error)} px')
+        print(f'y error = {int(y_error)} px')
+
+        if abs(int(x_error)) < 1 and abs(int(y_error)) < 1:
+            print('Successfully reached target! Program terminating')
+            time.sleep(5)
+            run = False
+            break
 
         arm_status = arm.get_status()
         arm_coords = arm_status.cartesian
@@ -145,10 +158,6 @@ def arm_thread():
 
         print(f'Moving above source block')
         arm.p2p_interpolation(robot_x, robot_y, arm_z, 0, 0, 0)
-
-        if abs(x_error) < 2 and abs(y_error) < 2:
-            print('Successfully reached target! Program terminating')
-            run = False
 
         x_error = None
         y_error = None
