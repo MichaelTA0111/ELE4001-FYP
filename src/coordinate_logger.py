@@ -54,10 +54,14 @@ class CoordinateLogger:
         for i in range(3):
             axes[i].plot(range(len(coordinates)), [int(coord[i]) for coord in coordinates])
             axes[i].yaxis.set_major_locator(plt.MaxNLocator(integer=True))  # Set y-axis ticks to integers
+            axes[i].set_xlabel('Time step')
 
         axes[0].set_title('x-ordinate over time')
+        axes[0].set_ylabel('x Value')
         axes[1].set_title('y-ordinate over time')
+        axes[1].set_ylabel('y Value')
         axes[2].set_title('Depth over time')
+        axes[2].set_ylabel('Depth Value')
 
         plt.tight_layout()
         plt.savefig(self.filename_png)
