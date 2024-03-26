@@ -38,7 +38,7 @@ def plot(location):
         axes[i].xaxis.set_major_locator(plt.MaxNLocator(integer=True))  # Set y-axis ticks to integers
         axes[i].yaxis.set_major_locator(plt.MaxNLocator(integer=True))  # Set y-axis ticks to integers
         axes[i].axhline(0, color='red', linestyle='--')
-        axes[i].legend()
+        axes[i].legend(loc='upper right')
 
     axes[0].set_title('x error over time')
     axes[0].set_ylabel('x error (px)')
