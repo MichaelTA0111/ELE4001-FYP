@@ -3,15 +3,16 @@ import matplotlib.pyplot as plt
 
 
 class CoordinateLogger:
-    def __init__(self, name):
+    def __init__(self, name, create=True):
         self.filename = f'../block_coordinates/block_coordinate_log_{name}'
         self.filename_csv = self.filename + '.csv'
         self.filename_png = self.filename + '.png'
         self.filename_svg = self.filename + '.svg'
         self.coordinate_list = []
 
-        with open(self.filename_csv, 'w') as f:
-            f.write('x,y,depth\n')
+        if create:
+            with open(self.filename_csv, 'w') as f:
+                f.write('x,y,depth\n')
 
     def log_coordinates(self, do_print=False):
         if len(self.coordinate_list):
@@ -48,7 +49,7 @@ class CoordinateLogger:
                     line_count += 1
 
         # Create a figure with 3 subplots
-        fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(12, 8))
+        fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(9, 7))
 
         # Plot x, y, and depth against index
         for i in range(3):
@@ -67,3 +68,10 @@ class CoordinateLogger:
         plt.savefig(self.filename_png)
         plt.savefig(self.filename_svg)
         plt.show()
+
+
+if __name__ == '__main__':
+    print('Input block location')
+    location = input()
+    coordinate_logger = CoordinateLogger(location, create=False)
+    coordinate_logger.graph_coordinates()
